@@ -157,10 +157,6 @@ Most major AI platforms now have native GitHub connectors that can access privat
 | Mistral | Connectors directory (MCP) | Yes | Not yet (writes supported, dispatch TBD) | All tiers including free |
 | Perplexity | App Connectors → GitHub | Yes | No (read-only) | Pro, Max, and Enterprise |
 
-¹ ChatGPT's Codex agent has full GitHub write access (commits, PRs, code reviews). The web chat connector is read-only.
-² Claude supports custom remote MCP connectors on all plans (free: 1 connector). A user could connect a [GitHub MCP server](https://github.com/github/github-mcp-server) with write access, but this requires setting up a GitHub OAuth App or PAT — non-trivial.
-³ A separate [Google Workspace GitHub extension](https://workspace.google.com/marketplace/app/github_integration/556146275714) offers write access (repos, issues, reviews) within Gemini Apps. Requires the Google Integrations helper app. This is separate from the import-code connector. Workflow dispatch not confirmed.
-
 **Google Drive connector status (.json files).** For users on the [local sync](examples/json-local-sync/SETUP.md) path who want their AI to read data files via Google Drive instead of GitHub.
 
 | Platform | Google Drive (.json) | How to Connect | Plan Notes |
