@@ -1,12 +1,20 @@
 # Section 11 — AI Coach Protocol
 
-**Protocol Version:** 11.26  
-**Last Updated:** 2026-04-03
+**Protocol Version:** 11.27  
+**Last Updated:** 2026-04-05
 **License:** [MIT](https://opensource.org/licenses/MIT)
 
 ### Changelog
 
-**v11.26 — Nutrition & Pacing Protocol (VirtualDS Intelligence Migration):**
+**v11.27 — Readiness Signal Hygiene (ACWR/RI):**
+- Low-side ACWR (<0.8) removed from readiness_decision ambers and ACWR alerts. Low ACWR is a load-state/undertraining context signal, not a fatigue or overload signal. Context still surfaces via `acwr_interpretation` in derived_metrics.
+- RI amber now requires 2-day persistence (`ri < 0.7` today AND yesterday) to filter single-night noise from a composite signal. Single-day dips in the 0.6–0.7 band are context, not amber. Red (`ri < 0.6`) unchanged — fires on any single day.
+- ACWR high-side boundary unified across code and docs: `≥ 1.3` amber/caution, `≥ 1.5` red/danger (replaces mixed `>` / `>=` usage).
+- Signal Classification table and Validated Endurance Ranges table reconciled to match the new readiness_decision logic.
+- New transparency note under Signal Classification explaining both changes.
+- Requires sync.py v3.97 (`recovery_index_yesterday`).
+
+**v11.26 — Nutrition & Pacing Protocol:**
 - Nutrition Protocol expansion: kJ→carbs dosing table, absorption limits by carb type, glycogen budget model, temperature-driven hydration frequency
 - Fast-start penalty emphasis (pacing literature, no specific magnitude claim)
 - W′ depletion under glycogen deficit: ~20% W′ reduction (Miura et al., 2000)
@@ -26,109 +34,18 @@
 - Evidence base: 11 entries (9 cited, 2 convention disclosures)
 - Requires sync.py v3.95 (polyline, start_time, indoor flag)
 
-**v11.23 — Checklist 5b: No Conversational Data Substitution**  
-- New self-validation checklist item 5b: training metrics must come from the current JSON data read — never from conversation history, prior messages, cached session context, or AI memory/recall. No data read = no metric cited.
-
-**v11.22 — Sustainability Profile (Race Estimation):**
-- New capability metric: `sustainability_profile` — per-sport power/HR sustainability table for race performance estimation
-- 42-day window, sport-filtered curves (power + HR per sport family via Intervals.icu API)
-- Cycling: three model layers per anchor — actual MMP, Coggan duration factors (Allen & Coggan, 3rd ed., midpoints), CP/W' model (P=CP+W'/t). `model_divergence_pct` = actual vs CP model — divergence IS the coaching signal
-- Non-cycling power sports (SkiErg, rowing): actual MMP only, no modeled layer
-- Indoor/outdoor source flag for cycling: max(Ride, VirtualRide) at each anchor, source indicates environment
-- Sport-specific anchor sets: cycling 300s–7200s, SkiErg/rowing 60s–1800s
-- Per-anchor: actual_watts, actual_wpkg, actual_hr, pct_lthr (sport-specific LTHR from v11.8 thresholds), source
-- Block-level: coverage_ratio, ftp_staleness_days (cycling only), weight fallback chain
-- CP/W' primary ≤20min, Coggan reference ≥60min, 30min crossover
-- Field definitions, interpretation guidance, Coggan duration table with published ranges
-- sync.py v3.91
-
-**v11.21 — Sleep Signal Simplification:**
-- Sleep quality and sleep score removed from readiness signal classification — hours only
-- Rationale: sleep quality/score are device-derived composites of HRV + HR during sleep, already captured as independent signals. Including them double-counts the same underlying physiology
-- Sleep signal now: Green ≥ 7h, Amber 5–7h, Red < 5h (no quality component)
-- Sleep quality/score remain in wellness data as coaching context — not wired into readiness_decision
-- HRV-unavailable fallback removed (sleep quality no longer substitutes as primary subjective readiness indicator)
-- `Sleep Quality = 4 → Reduce intensity` decision rule removed (downstream impact shows in HRV/RHR)
-- Tier 1 hierarchy updated: Sleep (hours) replaces Sleep (quality + hours)
-- sync.py v3.90
-
-**v11.20 — HR Curve Delta (Capability Metric):**
-- New capability metric: `hr_curve_delta` compares max sustained HR at 4 anchor durations (60s/300s/1200s/3600s) across two 28-day windows
-- No sport filter — HR is cross-sport physiological (dominated by hardest efforts regardless of modality)
-- Data key `values` (not `watts` as in power curves). Field names `current_bpm`/`previous_bpm`
-- Ambiguity framing: rising max sustained HR may indicate fitness or fatigue — AI must cross-reference
-- Rotation index: mean(60s,300s) - mean(1200s,3600s). No 5s anchor (peak HR ≠ energy system signal)
-- Field definitions, interpretation guidance, report template additions (weekly + block)
-- sync.py v3.88
-
-**v11.19 — Power Curve Delta (Capability Metric):**
-- New capability metric: `power_curve_delta` compares MMP at 5 anchor durations (5s/60s/300s/1200s/3600s) across two 28-day windows
-- Rotation index: sprint-biased vs endurance-biased adaptation direction. 300s excluded (transitional)
-- Single `power-curves` API call per sync (two windows in one request, sport-filtered type=Ride)
-- Curve matching by response ID (not list index) — handles empty windows when API omits curves with no data
-- Guards: per-anchor null (missing duration or 0 watts), division-by-zero (null pct_change), block-level (<3 valid anchors)
-- Field definitions, interpretation guidance, report template additions (weekly + block)
-- sync.py v3.87
-
-**v11.18 — Environmental Conditions Protocol:**
-- New section: delta-based heat stress tiers (relative to athlete's 14-day thermal baseline), absolute guardrails, insufficient-baseline fallback
-- Session-type modification rules: endurance (HR ceiling), threshold/SS (keep power, cut volume), VO₂max (keep targets, cut sets), long rides (power pacing, HR abort)
-- Heat acclimatization timeline, decay guidance, indoor heat interpretation, cardiac drift contextualization
-- Cross-references added to *3 Metabolic & Environmental Progression and Durability Sub-Metrics diagnostic
-- Evidence table updated (Tatterson, Tucker, Racinais, Périard, Hettinga, Ely, Steadman)
-- Template additions: heat-specific coach notes in pre/post-workout reports
-- Cold weather subsection: warm-up extension, bronchospasm risk, wind chill safety, cold power meter lag
-
-**v11.17 — Phase Context + Tomorrow Preview in Report Templates:**
-- Phase line added to pre-workout (Current Status Summary) and post-workout (Weekly totals) — first line, frames all metrics below
-- Conditional: include only when `phase_detection.confidence` is "high" or "medium"; omit when "low" or null
-- Tomorrow preview added to post-workout: next planned session after interpretation. Conditional: omit when no session planned
-- Session profile field documented in post-workout Field Notes table
-- Pre/post-workout "must include" lists updated in protocol
-
-**v11.16 — Wellness Field Expansion:**
-- All Intervals.icu wellness fields now passed through: subjective state (stress, mood, motivation, injury, fatigue, soreness, hydration), vitals (spO2, blood glucose, blood pressure, Baevsky SI, lactate, respiration), body composition (body fat, abdomen), nutrition (kcal, carbs, protein, fat), lifestyle (steps, hydration volume), cycle tracking (menstrual phase + predicted)
-- `wellness_field_scales` legend added to READ_THIS_FIRST — documents 1→4 positional scale (1 = best, 4 = worst) with per-field labels
-- Recovery Metrics section updated with extended wellness field reference
-- Bug fix: `hrvSdnn` → `hrvSDNN` case mismatch in `_format_wellness()` (was silently returning null)
-- Pure data passthrough — no readiness_decision changes, no new decision logic
-- sync.py v3.85
-
-**v11.15 — Per-Sport Zone Preference:**
-- `ZONE_PREFERENCE` config: per-sport override for which zone basis (power/HR) feeds aggregations
-- Format: `sport_family:basis` pairs, e.g. `run:hr,cycling:power`. Unspecified sports keep default (power-preferred, HR fallback)
-- Config cascade: `.sync_config.json` → `ZONE_PREFERENCE` env var → default. `--setup` wizard updated.
-- `zone_basis` field added to `zone_distribution_7d`, all `seiler_tid_*` blocks: `"power"` / `"hr"` / `"mixed"` / null
-- `zone_preference` field added to `READ_THIS_FIRST` — shows active config
-- `_aggregate_seiler_zones()` refactored to use shared `_get_activity_zones()` (eliminated duplicated zone extraction)
-- Per-activity zone output unchanged — still includes both `power_zones` and `hr_zones`
-- sync.py v3.83
-
-**v11.14 — Feel/RPE Scope Clarification:**
-- Feel removed from automated readiness_decision signals — 6 signals remain (HRV, RHR, Sleep, TSB, ACWR, RI)
-- Feel/RPE defined at three layers: wellness (daily entry), activity (post-session), in-session (real-time)
-- Feel enriches coaching decisions when present in data; solicited when decision-relevant; never required as routine input
-- Feel removed from Tier 1 PRIMARY READINESS hierarchy — replaced by Sleep (quality + hours)
-- Readiness Thresholds header updated: "All Available Must Be Met" (unavailable metrics do not block progression)
-- Feel/RPE Override block added to readiness_decision: escalation unconditional, de-escalation P2 only (max 2 amber, athlete must attribute cause, AI documents override). P0/P1 not overridable. Underreporting caveat when 3+ objective signals converge.
-
-**v11.13 — Readiness Decision (AAS Formalization):**
-- Pre-computed `readiness_decision` replaces implicit go/modify/skip synthesis
-- Priority ladder: P0 (safety stop) → P1 (acute overload) → P2 (accumulated fatigue) → P3 (green light)
-- 7 signals evaluated: HRV, RHR, Sleep, Feel, TSB, ACWR, RI — each with green/amber/red/unavailable status
-- Phase modifiers: Build loosens thresholds (3 amber), Taper/Race week tighten (1 amber), all others default (2 amber)
-- Structured modification output: trigger categories + adjustment directions (intensity/volume/cap_zone)
-- Wires into existing alerts (P0/P1 read tier-1 alarms, no duplication)
-- AAS row removed from threshold table — replaced by `readiness_decision` reference
-- sync.py v3.72: `_compute_readiness_decision()`, `_get_phase_modifiers()`, `_build_modification()`
-
-**v11.12 — HRRc Integration + Phase Transition Narrative:**
-- HRRc (heart rate recovery) added to activity output and capability namespace (7d/28d aggregate trend)
-- HRRc: largest 60s HR drop (bpm) after exceeding threshold HR for >1 min. API field `icu_hrr`. Display only
-- Trend: 7d mean vs 28d mean, >10% = meaningful. Min 1 session/7d, 3 sessions/28d
-- Phase transition narrative guidance added to weekly/block report templates
-- Phase timeline added to block report template
-- References: Fecchio et al. (2019) HRR reproducibility; Lamberts et al. (2024) cyclist HRR reliability; Buchheit (2006)
+**v11.23** — Checklist 5b: training metrics must come from current JSON data read, never from conversation history, prior messages, or cached/recalled context  
+**v11.22** — Sustainability Profile capability metric: per-sport power/HR sustainability table for race estimation, 42-day window, cycling three-layer model (actual MMP, Coggan factors, CP/W'); sync.py v3.91  
+**v11.21** — Sleep Signal Simplification: hours-only (quality/score removed from readiness — double-counts HRV/HR); sync.py v3.90  
+**v11.20** — HR Curve Delta capability metric: max sustained HR at 4 anchor durations across two 28-day windows, no sport filter (cross-sport physiological); sync.py v3.88  
+**v11.19** — Power Curve Delta capability metric: MMP at 5 anchor durations across two 28-day windows, rotation index (sprint vs endurance adaptation); sync.py v3.87  
+**v11.18** — Environmental Conditions Protocol: delta-based heat stress tiers, session-type modification rules, acclimatization timeline, cold-weather subsection  
+**v11.17** — Phase context + tomorrow preview in report templates (conditional on phase confidence, session planning)  
+**v11.16** — Wellness field expansion: all Intervals.icu wellness fields passthrough (subjective, vitals, body comp, nutrition, lifestyle, cycle); `hrvSDNN` case-bug fix; sync.py v3.85  
+**v11.15** — Per-sport zone preference: `ZONE_PREFERENCE` config for power/HR zone basis per sport family (config → env → default cascade); sync.py v3.83  
+**v11.14** — Feel/RPE scope clarified: removed from automated readiness_decision signals (6 remain); three-layer definition (wellness/activity/in-session); Feel/RPE Override block, P2 de-escalation only  
+**v11.13** — Readiness Decision (AAS formalization): pre-computed go/modify/skip, P0–P3 priority ladder, 7 signals, phase modifiers, structured modification output; sync.py v3.72  
+**v11.12** — HRRc integration (heart rate recovery, 7d/28d trend); phase transition narrative + phase timeline added to weekly/block report templates  
 
 **v11.11** — Phase Detection v2: dual-stream architecture (retrospective + prospective), 8 phase states, confidence model, hysteresis, reason codes  
 **v11.10** — Hard day HR zone fallback for non-power sports (running, SkiErg, rowing); shared zone helpers  
@@ -417,7 +334,7 @@ Phase detection uses a **dual-stream architecture** combining retrospective trai
 
 | **Phase** | **Classification Logic** | **Key Thresholds** |
 |-----------|------------------------|--------------------|
-| Overreached | Safety gate — triggers immediately when detected | Current-week ACWR >1.5, or elevated monotony (>2.5) + ACWR >1.3 + rising trend |
+| Overreached | Safety gate — triggers immediately when detected | Current-week ACWR ≥1.5, or elevated monotony (>2.5) + ACWR ≥1.3 + rising trend |
 | Taper | Race-anchored — requires race in calendar | Race (A/B priority) within 14 days + volume reducing (planned TSS ≤80% of recent avg) |
 | Peak | Race approaching, fitness at cycle high | Race within 21 days + CTL within 5% of lookback max + volume NOT yet reducing + positive CTL slope |
 | Deload | Calendar-driven load reduction within Build block | Build history (rising CTL + ≥1.5 hard days/week over 3+ weeks) + planned TSS ≤80% + no hard sessions planned. Confirmed if next week load resumes (≥80%). Medium confidence if next-week plan is empty. |
@@ -787,7 +704,7 @@ Present actionable guidance in concise, prioritized lists (3–5 items maximum).
 
 Each recommendation must be specific, measurable, and data-linked:
 - "Maintain ≥70% Z1–Z2 time this week."
-- "If RI < 0.7 for 3 days, shift next 3 sessions to recovery emphasis."
+- "If RI < 0.7 for 3+ consecutive days, shift next 3 sessions to recovery emphasis."
 - “FTP reassessments are not scheduled.”
 
 Avoid narrative advice or motivational filler.
@@ -805,10 +722,10 @@ When validating datasets, cross-check computed fatigue and load ratios against v
 
 | **Metric**                   | **Valid Range**                                    | **Flag (Early Warning)**           | **Alarm (Action Needed)**           | **Notes**                                                           |
 |------------------------------|----------------------------------------------------|------------------------------------|-------------------------------------|---------------------------------------------------------------------|
-| ACWR                         | 0.8–1.3                                            | At 0.8 / 1.3 (edges of optimal)   | At 0.75 / 1.35 (outside optimal)   | Persistence: >1.3 or <0.8 for 3+ days → alarm                     |
+| ACWR                         | 0.8–1.3                                            | ≥ 1.3 (edge of optimal)           | ≥ 1.35 (above optimal)             | High-side only for readiness/overload. Low-side (<0.8) is load-state context (undertraining/taper), surfaced via acwr_interpretation. Persistence: ≥ 1.3 for 3+ days → alarm |
 | Monotony                     | < 2.5                                              | At 2.3                             | At 2.5                              | See Monotony Deload Context below                                   |
 | Strain                       | < 3500                                             | —                                  | > 3500                              | Cumulative stress                                                   |
-| Recovery Index (RI)          | ≥ 0.8 good / 0.6–0.79 moderate / < 0.6 deload      | < 0.7 for > 1 day                 | < 0.7 for 3 days → deload review; < 0.6 → immediate deload | Readiness indicator                                |
+| Recovery Index (RI)          | ≥ 0.8 good / 0.6–0.79 moderate / < 0.6 deload      | < 0.7 for 2+ days                 | < 0.7 for 3+ days → deload review; < 0.6 → immediate deload | Readiness indicator. Single-day dips 0.6–0.79 are context, not amber. |
 | HRV                          | Within personal baseline                           | ↓ > 20% vs baseline               | Persists > 2 days                   | Use 7-day rolling baseline                                          |
 | RHR                          | Within personal baseline                           | ↑ ≥ 5 bpm vs baseline             | Persists > 2 days                   | Use 7-day rolling baseline                                          |
 | Fatigue Trend                | −0.2 to +0.2                                       | —                                  | —                                   | ΔATL − ΔCTL (stable range)                                          |
@@ -877,8 +794,8 @@ RI = (HRV_today / HRV_baseline) ÷ (RHR_today / RHR_baseline)
 
 **RI Trend Monitoring:**
 - 7-day mean should remain ≥ 0.8 for progression weeks
-- If RI < 0.7 for > 1 day → flag for monitoring (early warning)
-- If RI < 0.7 for > 3 consecutive days → trigger block-level deload or load-modulation review
+- If RI < 0.7 for 2+ consecutive days → flag for monitoring (early warning)
+- If RI < 0.7 for 3+ consecutive days → trigger block-level deload or load-modulation review
 - If RI < 0.6 → immediate deload required regardless of duration
 
 AI systems must only consider caloric-reduction or weight-optimization phases during readiness-positive windows (DI ≥ 0.95, HR drift ≤ 3 %, RI ≥ 0.8), referencing Section 8 — Weight Adjustment Control.
@@ -894,8 +811,8 @@ AI systems must only consider caloric-reduction or weight-optimization phases du
 | Priority | Condition | Result |
 |----------|-----------|--------|
 | **P0 — Safety stop** | RI < 0.6, OR any tier-1 alarm active | **Skip** (non-negotiable) |
-| **P1 — Acute overload** | ACWR > 1.5, OR (TSB < -30 + HRV ↓>10%), OR (RI < 0.7 + tier-1 alert persisting ≥2 days) | **Skip** |
-| **P1 — Acute overload (modify)** | ACWR > 1.3, OR (TSB < -25 + HRV ↓>10%) | **Modify** |
+| **P1 — Acute overload** | ACWR ≥ 1.5, OR (TSB < -30 + HRV ↓>10%), OR (RI < 0.7 + tier-1 alert persisting ≥2 days) | **Skip** |
+| **P1 — Acute overload (modify)** | ACWR ≥ 1.3, OR (TSB < -25 + HRV ↓>10%) | **Modify** |
 | **P2 — Accumulated fatigue** | Red signal count ≥ 2, OR (1 red in tightened phase), OR amber count ≥ phase threshold | **Modify** (or Skip if 2+ red) |
 | **P3 — Green light** | None of the above | **Go** |
 
@@ -907,10 +824,14 @@ AI systems must only consider caloric-reduction or weight-optimization phases du
 | RHR | At or below baseline | ↑ 3–4 bpm | ↑ ≥5 bpm |
 | Sleep | ≥ 7h | 5–7h | < 5h |
 | TSB | > phase threshold (default -15) | Between threshold and -30 | < -30 |
-| ACWR | 0.8–1.3 | <0.8 or 1.3–1.5 | > 1.5 |
-| RI | ≥ 0.8 | 0.6–0.79 | < 0.6 |
+| ACWR | < 1.3 | ≥ 1.3 and < 1.5 | ≥ 1.5 |
+| RI | ≥ 0.7, or single-day 0.6–0.69 | < 0.7 for 2+ consecutive days | < 0.6 |
 
 Missing signals are classified as `unavailable` and excluded from amber/red counts.
+
+**Heuristic notes (transparency):**
+- **Low-side ACWR is intentionally excluded from readiness ambers.** An ACWR < 0.8 indicates reduced recent load relative to chronic fitness (taper, detraining, or simply an off-rhythm week) — it is a load-state/context signal, not a fatigue or overload signal. Using it as a readiness penalty conflates "did little recently" with "can't handle much today," which are near-opposite states. Low-side context still surfaces via `derived_metrics.acwr_interpretation` ("undertraining") for the AI layer to read as context, but it no longer contributes to amber counts or overload alerts.
+- **RI amber requires 2-day persistence** (`ri < 0.7` today AND yesterday) to filter single-night noise from a composite signal built on HRV and RHR. Single-day dips in the 0.6–0.7 band remain visible via the reported value but do not trigger an amber. Red (`ri < 0.6`) still fires on any single day — deload review is warranted regardless of persistence.
 
 **Feel/RPE Override:**
 Athlete-reported state (wellness Feel, activity RPE, or direct communication) can adjust the readiness_decision in either direction:
@@ -1097,7 +1018,7 @@ It governs acute, session-level performance safety, ensuring localized overreach
 - Classify as acute overreach.  
 - For minor deviations (isolated fatigue signals or transient HR drift), insert **1–2 days of Z1-only training** to restore autonomic stability.  
 - If fatigue persists after 2 days (HR recovery >15 bpm or RPE +2), revert next interval session to prior week’s load or reduce volume 30–40% for 3–4 days.
-- Maintain normal Z2 endurance unless global readiness metrics also indicate systemic fatigue (RI < 0.7 for >3 days, HRV ↓ > 20%)
+- Maintain normal Z2 endurance unless global readiness metrics also indicate systemic fatigue (RI < 0.7 for 3+ days, HRV ↓ > 20%)
 
 ---
 
@@ -2359,7 +2280,7 @@ This header documents provenance, deterministic context, and planning logic for 
 Plans breaching tolerance limits must not publish until validated.
 
 AI systems must output an explicit reason string for rejections, e.g.:
-"error": "ACWR > 1.35 — exceeds safe progression threshold"
+"error": "ACWR ≥ 1.35 — exceeds safe progression threshold"
 
 Human-review override requires athlete confirmation and metadata flag "override": true.
 
